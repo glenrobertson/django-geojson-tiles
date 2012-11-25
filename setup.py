@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
 from geojson_tiles import __version__
 
 README = open('README.rst').read()
