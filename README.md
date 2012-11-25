@@ -1,4 +1,4 @@
-# Django GeoJSON Tile
+# Django GeoJSON Tiles
 A simple Django view to serve GeoJSON tiles from a GeoDjango model
 
 ## Description
