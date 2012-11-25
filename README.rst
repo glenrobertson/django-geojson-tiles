@@ -12,6 +12,8 @@ Each feature corresponds to a row of the model.
 Setup
 =====
 
+        pip install django-geojson-tiles
+
 Add the following to your urls.py:
 
 ::
