@@ -2,7 +2,8 @@
 A simple Django view to serve GeoJSON tiles from a GeoDjango model
 
 ## Description
-The view will return a GeoJSON FeatureCollection for each tile
+The view will return a GeoJSON FeatureCollection for each tile.
+
 Each feature corresponds to a row of the model.
 
 ## Setup
