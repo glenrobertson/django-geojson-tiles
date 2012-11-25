@@ -7,6 +7,10 @@ The view will return a GeoJSON FeatureCollection for each tile.
 Each feature corresponds to a row of the model.
 
 ## Setup
+
+        pip install django-geojson-tiles
+
+
 Add the following to your urls.py:
 
         from geojson_tiles.views import GeoJSONTile
