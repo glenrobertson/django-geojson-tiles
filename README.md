@@ -17,5 +17,5 @@ Add the following to your urls.py:
         )
 
 ## Notes
-`trim_to_boundary=True` will result in GeoJSON tiles with geometries trimmed to the tile boundary
-`properties`=[...] can be used to limit the feature's properties that are serialized
+1. `trim_to_boundary=True` will result in GeoJSON tiles with geometries trimmed to the tile boundary
+1. `properties`=[...] can be used to limit the feature's properties that are serialized
