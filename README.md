@@ -2,7 +2,8 @@
 A simple Django view to serve GeoJSON tiles from a GeoDjango model
 
 ## Description
-The view will return a GeoJSON FeatureCollection for each tile
+The view will return a GeoJSON FeatureCollection for each tile.
+
 Each feature corresponds to a row of the model.
 
 ## Setup
@@ -17,5 +18,5 @@ Add the following to your urls.py:
         )
 
 ## Notes
-`trim_to_boundary=True` will result in GeoJSON tiles with geometries trimmed to the tile boundary
-`properties`=[...] can be used to limit the feature's properties that are serialized
+1. `trim_to_boundary=True` will result in GeoJSON tiles with geometries trimmed to the tile boundary
+1. `properties`=[...] can be used to limit the feature's properties that are serialized
