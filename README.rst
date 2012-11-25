@@ -14,7 +14,7 @@ Add the following to your urls.py:
 
         urlpatterns = patterns('',
             url(r'^your_endpoint/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+).json$', 
-                GeoJSONTile(GeometryModel, 'geometry_field', trim_to_boundary=True)
+                GeoJSONTile(GeometryModel, 'geometry_field', trim_to_boundary=True))
         )
 
 ## Notes
