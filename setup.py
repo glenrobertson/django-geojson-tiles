@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 from geojson_tiles import __version__
 
-README = open('README.MD').read()
+README = open('README.md').read()
 
 setup(name='django-geojson-tiles',
       version=__version__,
