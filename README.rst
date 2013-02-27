@@ -30,7 +30,7 @@ Add the following to your urls.py:
 
 Notes
 =====
-1. ``geometry_field='geometry_field' specifies the geometry to use in the feature. If no geometry_field is specified: the first GeometryField in the model's field set is used.
+1. ``geometry_field='geometry_field'`` specifies the geometry to use in the feature. If no geometry_field is specified: the first GeometryField in the model's field set is used.
 2. ``trim_to_boundary=True`` will result in GeoJSON tiles with geometries trimmed to the tile boundary
 3. ``properties=[...]`` can be used to limit the feature's properties that are serialized
-4. ``properties={field_name: 'property name'} will limit the feature's properties and map field names (keys) to property names (values).
+4. ``properties={'field_name': 'property name'}`` will limit the feature's properties and map field names (keys) to property names (values).
