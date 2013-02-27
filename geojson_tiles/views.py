@@ -1,5 +1,6 @@
 from django.contrib.gis.geos import Polygon
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseServerError
+from django.contrib.gis.db.models import GeometryField
 from serializers import GeoJSONSerializer
 import ModestMaps
 import TileStache
@@ -31,13 +32,25 @@ class GeoJSONTile:
         modest_map = ModestMaps.mapByExtentZoom(self.provider, tl, br, z)
         return bbox, modest_map
 
-    def __init__(self, model, geometry_field, trim_to_boundary=True, properties=None):
+    def __init__(self, model, geometry_field=None, trim_to_boundary=True, properties=None):
         self.model = model
         self.geometry_field = geometry_field
         self.trim_to_boundary = trim_to_boundary
         self.properties = properties
 
+        # if geometry field name is not specified,
+        # use the first GeometryField that is found
+        if self.geometry_field == None and self.model != None:
+            try:
+                field = [f for f in self.model._meta.fields if isinstance(f, GeometryField)][0]
+                self.geometry_field = field.name
+            except IndexError:
+                pass
+
     def __call__(self, request, z, x, y):
+        if self.geometry_field == None:
+            return HttpResponseServerError('No geometry was specified or the model "%s" did not have a GeometryField present' % (self.model._meta.object_name))
+
         bbox, modest_map = self.coords_to_bbox_mmap(z, x, y)
 
         shapes = self.model.objects.filter(**{

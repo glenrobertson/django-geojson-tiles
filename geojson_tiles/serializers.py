@@ -96,12 +96,24 @@ class GeoJSONSerializer(PythonSerializer):
         self._current = {"type": "Feature", "properties": {}, "id": obj.pk}
 
     def end_object(self, obj):
-        # filter the feature's properties by the property list in the options
+        # filter the feature's properties by the properties in the options
+        # this is either a list of field names
+        # or a dictionary of field names to outputted property names
         if 'properties' in self.options:
-            self._current['properties'] = dict([
-                (p, v) for p, v in self._current['properties'].items()
-                    if p in self.options['properties']
-            ])
+            properties = {}
+
+            # filter the object's properties by the dictionary keys
+            # translate the property names to the dictionary values
+            if isinstance(self.options['properties'], dict):
+                for field_name, property_name in self.options['properties'].iteritems():
+                    properties[property_name] = self._current['properties'][field_name]
+
+            # filter the object's properties by the list
+            else:
+                for field_name in self.options['properties'].iteritems():
+                    properties[field_name] = self._current['properties'][field_name]
+
+            self._current['properties'] = properties
 
         self.feature_collection["features"].append(self._current)
         self._current = None
