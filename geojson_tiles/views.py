@@ -32,6 +32,18 @@ class GeoJSONTile:
         modest_map = ModestMaps.mapByExtentZoom(self.provider, tl, br, z)
         return bbox, modest_map
 
+    def pre_serialization(self, queryset, z, x, y, bbox):
+        """
+        Hook to modify queryset before serialization
+        """
+        return queryset
+
+    def post_serialization(self, geojson):
+        """
+        Hook to modify geojson after serialization
+        """
+        return geojson
+
     def __init__(self, model, geometry_field=None, trim_to_boundary=True, properties=None):
         self.model = model
         self.geometry_field = geometry_field
@@ -71,5 +83,7 @@ class GeoJSONTile:
         if self.properties:
             serializer_options.update(properties=self.properties)
 
+        shapes = self.pre_serialization(shapes, z, x, y, bbox)
         data = self.serializer.serialize(shapes, **serializer_options)
+        data = self.post_serialization(data)
         return HttpResponse(data, content_type='application/json')
