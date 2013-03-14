@@ -21,21 +21,8 @@ from django.contrib.gis.db.models.fields import GeometryField
 
 class DjangoGeoJSONEncoder(DjangoJSONEncoder):
 
-    DATE_FORMAT = '%Y-%m-%d'
-    TIME_FORMAT = '%H:%M:%S'
-
     def default(self, o):
-        if isinstance(o, datetime.datetime):
-            d = datetime_safe.new_datetime(o)
-            return d.strftime("%s %s" % (self.DATE_FORMAT, self.TIME_FORMAT))
-        elif isinstance(o, datetime.date):
-            d = datetime_safe.new_date(o)
-            return d.strftime(self.DATE_FORMAT)
-        elif isinstance(o, datetime.time):
-            return o.strftime(self.TIME_FORMAT)
-        elif isinstance(o, decimal.Decimal):
-            return float(o)
-        elif isinstance(o, GEOSGeometry):
+        if isinstance(o, GEOSGeometry):
             return json.loads(o.geojson)
         else:
             return super(DjangoGeoJSONEncoder, self).default(o)
