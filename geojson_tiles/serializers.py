@@ -43,9 +43,7 @@ class GeoJSONSerializer(PythonSerializer):
         if self.crs == False:
             return None
         crs = {}
-        srid = self.options.get("srid", None)
-        if srid is None:
-            field, srid = self.get_geometry_field(queryset)
+        srid = self.options.get("srid", "4326")
 
         crs["type"] = "link"
         properties = {}
@@ -54,62 +52,17 @@ class GeoJSONSerializer(PythonSerializer):
         crs["properties"] = properties
         return crs
 
-    def get_geometry_field(self, queryset):
-        fieldname = self.options.get("geometryfield", None)
-        fields = queryset.model._meta.fields
-        geometry_fields = [f for f in fields if isinstance(f, GeometryField)]
-        if fieldname:
-
-            # aggregate function, e.g. intersection
-            # we have to get the srid from the first item in the queryset
-            # as it is a value and not a field
-            field = getattr(queryset, fieldname)
-
-            if isinstance(field, types.MethodType):
-                return field, getattr(queryset[0], fieldname).srid
-
-            else:
-                fieldnames = [x.name for x in geometry_fields]
-                try:
-                    field = geometry_fields[fieldnames.index(fieldname)]
-                except IndexError:
-                    raise Exception("%s is not a valid geometry field on %s" % (fieldname, queryset.model.__class__.__name__))
-        else:
-            # We only currently support one geometry field
-            field = geometry_fields[0]
-        return field, field.srid
-
     def start_object(self, obj):
         self._current = {"type": "Feature", "properties": {}, "id": obj.pk}
 
     def end_object(self, obj):
-        # filter the feature's properties by the properties in the options
-        # this is either a list of field names
-        # or a dictionary of field names to outputted property names
-        if 'properties' in self.options:
-            properties = {}
-
-            # filter the object's properties by the dictionary keys
-            # translate the property names to the dictionary values
-            if isinstance(self.options['properties'], dict):
-                for field_name, property_name in self.options['properties'].iteritems():
-                    properties[property_name] = self._current['properties'][field_name]
-
-            # filter the object's properties by the list
-            else:
-                for field_name in self.options['properties'].iteritems():
-                    properties[field_name] = self._current['properties'][field_name]
-
-            self._current['properties'] = properties
-
         self.feature_collection["features"].append(self._current)
         self._current = None
 
     def end_serialization(self):
         self.options.pop('stream', None)
-        self.options.pop('fields', None)
-        self.options.pop('geometry_field', None)
         self.options.pop('properties', None)
+        self.options.pop('geometry_field', None)
         self.options.pop('use_natural_keys', None)
         self.options.pop('crs', None)
         self.options.pop('srid', None)
@@ -117,25 +70,30 @@ class GeoJSONSerializer(PythonSerializer):
         json.dump(self.feature_collection, self.stream, cls=DjangoGeoJSONEncoder, **self.options)
 
     def handle_field(self, obj, field):
-        # attribute
+        # 'field' can either be a string of the field name
+        # or a field object
         if isinstance(field, basestring):
             value = getattr(obj, field)
-            if field == 'geojson':
-                self._current['geometry'] = json.loads(value)
-            elif isinstance(value, GEOSGeometry):
-                self._current['geometry'] = value
-            else:
-                self._current['properties'][field] = value
-        # field
+            field_name = field
         else:
             value = field._get_val_from_obj(obj)
-            if isinstance(value, GEOSGeometry):
-                self._current['geometry'] = value
-            elif is_protected_type(value):
-                self._current['properties'][field.name] = value
+            field_name = field.name
+
+        if field_name == self.geometry_field and isinstance(value, GEOSGeometry):
+            # ignore other geometries, only one geometry per feature
+            self._current['geometry'] = value
+
+        elif self.properties and \
+            field_name in self.properties:
+            # set the field name to the key's value mapping in self.properties
+            if isinstance(self.properties, dict):
+                property_name = self.properties[field_name]
+                self._current['properties'][property_name] = value
             else:
-                self._current['properties'][field.name] = field.value_to_string(obj)
-            
+                self._current['properties'][field_name] = value
+
+        elif not self.properties:
+            self._current['properties'][field_name] = value            
 
     def getvalue(self):
         if callable(getattr(self.stream, 'getvalue', None)):
@@ -171,8 +129,8 @@ class GeoJSONSerializer(PythonSerializer):
         self.options = options
 
         self.stream = options.get("stream", StringIO())
-        self.selected_fields = options.get("fields")
-        self.geometry_field = options.get("geometry_field", None)
+        self.properties = options.get("properties")
+        self.geometry_field = options.get("geometry_field")
         self.use_natural_keys = options.get("use_natural_keys", False)
         self.bbox = options.get("bbox", None)
         self.crs = options.get("crs", True)
@@ -183,9 +141,14 @@ class GeoJSONSerializer(PythonSerializer):
         local_fields = queryset.model._meta.local_fields
         many_to_many_fields = queryset.model._meta.many_to_many
 
+        # populate each queryset obj as a feature
         for obj in queryset:
             self.start_object(obj)
 
+            # handle the geometry field
+            self.handle_field(obj, self.geometry_field)
+
+            # handle the property fields
             for field in local_fields:
                 # don't include the pk in the properties
                 # as it is in the id of the feature
@@ -194,18 +157,15 @@ class GeoJSONSerializer(PythonSerializer):
 
                 if field.serialize or field.primary_key:
                     if field.rel is None:
-                        if self.selected_fields is None or field.attname in self.selected_fields:
+                        if self.properties is None or field.attname in self.properties:
                             self.handle_field(obj, field)
                     else:
-                        if self.selected_fields is None or field.attname[:-3] in self.selected_fields:
+                        if self.properties is None or field.attname[:-3] in self.properties:
                             self.handle_fk_field(obj, field)
             for field in many_to_many_fields:
                 if field.serialize:
-                    if self.selected_fields is None or field.attname in self.selected_fields:
+                    if self.properties is None or field.attname in self.properties:
                         self.handle_m2m_field(obj, field)
-
-            if self.geometry_field:
-                self.handle_field(obj, self.geometry_field)
 
             self.end_object(obj)
         self.end_serialization()

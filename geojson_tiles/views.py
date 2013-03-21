@@ -1,6 +1,6 @@
 from django.contrib.gis.geos import Polygon
 from django.http import HttpResponse, HttpResponseServerError
-from django.contrib.gis.db.models import GeometryField
+from django.contrib.gis.db.models import GeometryField, MultiPointField, PointField
 from serializers import GeoJSONSerializer
 import ModestMaps
 import TileStache
@@ -68,6 +68,11 @@ class GeoJSONTile:
         shapes = self.model.objects.filter(**{
             '%s__intersects' % self.geometry_field: bbox
         })
+
+        # Can't trim point geometries to a boundary
+        self.trim_to_boundary = self.trim_to_boundary \
+            and not isinstance(shapes.model._meta.get_field(self.geometry_field), PointField) \
+            and not isinstance(shapes.model._meta.get_field(self.geometry_field), MultiPointField) \
 
         if self.trim_to_boundary:
             shapes = shapes.intersection(bbox)
