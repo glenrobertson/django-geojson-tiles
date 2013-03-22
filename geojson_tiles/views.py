@@ -38,7 +38,7 @@ class GeoJSONTile:
         """
         return queryset
 
-    def post_serialization(self, geojson):
+    def post_serialization(self, geojson, z, x, y, bbox):
         """
         Hook to modify geojson after serialization
         """
@@ -90,5 +90,5 @@ class GeoJSONTile:
 
         shapes = self.pre_serialization(shapes, z, x, y, bbox)
         data = self.serializer.serialize(shapes, **serializer_options)
-        data = self.post_serialization(data)
+        data = self.post_serialization(data, z, x, y, bbox)
         return HttpResponse(data, content_type='application/json')
