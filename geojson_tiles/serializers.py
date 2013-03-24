@@ -10,6 +10,8 @@ import datetime
 import decimal
 import types
 
+from django.db.models.base import ModelBase
+from django.db.models.query import ValuesQuerySet
 from django.core.serializers.python import Serializer as PythonSerializer
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.encoding import is_protected_type, smart_unicode
@@ -29,9 +31,9 @@ class DjangoGeoJSONEncoder(DjangoJSONEncoder):
 
 
 class GeoJSONSerializer(PythonSerializer):
-    def start_serialization(self, queryset):
+    def start_serialization(self):
         self.feature_collection = {"type": "FeatureCollection", "features": []}
-        self.feature_collection["crs"] = self.get_crs(queryset)
+        self.feature_collection["crs"] = self.get_crs()
 
         bbox = self.options.pop('bbox', None)
         if bbox:
@@ -39,7 +41,7 @@ class GeoJSONSerializer(PythonSerializer):
 
         self._current = None
 
-    def get_crs(self, queryset):
+    def get_crs(self):
         if self.crs == False:
             return None
         crs = {}
@@ -53,7 +55,25 @@ class GeoJSONSerializer(PythonSerializer):
         return crs
 
     def start_object(self, obj):
-        self._current = {"type": "Feature", "properties": {}, "id": obj.pk}
+        self._current = {"type": "Feature", "properties": {}}
+
+        # Try to determine the primary key from the obj
+        # self.primary_key can be a function (callable on obj), or a string
+        # if self.primary_key is not set, use obj.pk if obj is a Model
+        # otherwise the primary key will not be used
+        primary_key = None
+        if self.primary_key and hasattr(self.primary_key, '__call__'):
+            primary_key = self.primary_key(obj)
+        elif self.primary_key and isinstance(self.primary_key, basestring):
+            if isinstance(obj, ModelBase):
+                primary_key = getattr(obj, self.primary_key)
+            else:
+                primary_key = obj[self.primary_key]
+        elif isinstance(obj, ModelBase):
+            primary_key = obj.pk
+
+        if primary_key:
+            self._current['id'] = primary_key
 
     def end_object(self, obj):
         self.feature_collection["features"].append(self._current)
@@ -62,6 +82,7 @@ class GeoJSONSerializer(PythonSerializer):
     def end_serialization(self):
         self.options.pop('stream', None)
         self.options.pop('properties', None)
+        self.options.pop('primary_key', None)
         self.options.pop('geometry_field', None)
         self.options.pop('use_natural_keys', None)
         self.options.pop('crs', None)
@@ -69,15 +90,14 @@ class GeoJSONSerializer(PythonSerializer):
 
         json.dump(self.feature_collection, self.stream, cls=DjangoGeoJSONEncoder, **self.options)
 
-    def handle_field(self, obj, field):
-        # 'field' can either be a string of the field name
-        # or a field object
-        if isinstance(field, basestring):
-            value = getattr(obj, field)
-            field_name = field
+    def handle_field(self, obj, field_name):
+        if isinstance(obj, ModelBase):
+            value = getattr(obj, field_name)
+        elif isinstance(obj, dict):
+            value = obj[field_name]
         else:
-            value = field._get_val_from_obj(obj)
-            field_name = field.name
+            # Only supports dicts and models, not lists (e.g. values_list)
+            return
 
         if field_name == self.geometry_field and isinstance(value, GEOSGeometry):
             # ignore other geometries, only one geometry per feature
@@ -122,21 +142,22 @@ class GeoJSONSerializer(PythonSerializer):
             self._current['properties'][field.name] = [m2m_value(related)
                                for related in getattr(obj, field.name).iterator()]
 
-    def serialize(self, queryset, **options):
-        """
-        Serialize a queryset.
-        """
-        self.options = options
+    def serialize_values_queryset(self, queryset):
+        for obj in queryset:
+            self.start_object(obj)
 
-        self.stream = options.get("stream", StringIO())
-        self.properties = options.get("properties")
-        self.geometry_field = options.get("geometry_field")
-        self.use_natural_keys = options.get("use_natural_keys", False)
-        self.bbox = options.get("bbox", None)
-        self.crs = options.get("crs", True)
+            # handle the geometry field
+            self.handle_field(obj, self.geometry_field)
 
-        self.start_serialization(queryset)
+            for field_name in obj:
+                if not field_name in obj:
+                    continue
+                if self.properties is None or field_name in self.properties:
+                    self.handle_field(obj, field_name)
 
+            self.end_object(obj)
+
+    def serialize_queryset(self, queryset):
         opt = queryset.model._meta
         local_fields = queryset.model._meta.local_fields
         many_to_many_fields = queryset.model._meta.many_to_many
@@ -166,7 +187,29 @@ class GeoJSONSerializer(PythonSerializer):
                 if field.serialize:
                     if self.properties is None or field.attname in self.properties:
                         self.handle_m2m_field(obj, field)
-
             self.end_object(obj)
+
+    def serialize(self, queryset, **options):
+        """
+        Serialize a queryset.
+        """
+        self.options = options
+
+        self.stream = options.get("stream", StringIO())
+        self.primary_key = options.get("primary_key", None)
+        self.properties = options.get("properties")
+        self.geometry_field = options.get("geometry_field")
+        self.use_natural_keys = options.get("use_natural_keys", False)
+        self.bbox = options.get("bbox", None)
+        self.crs = options.get("crs", True)
+
+        self.start_serialization()
+        
+        if isinstance(queryset, ValuesQuerySet):
+            self.serialize_values_queryset(queryset)
+
+        elif isinstance(queryset, QuerySet):
+            self.serialize_queryset(queryset)
+
         self.end_serialization()
         return self.getvalue()

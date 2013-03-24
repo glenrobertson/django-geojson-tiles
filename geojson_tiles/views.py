@@ -18,10 +18,6 @@ class GeoJSONTile:
     serializer = GeoJSONSerializer()
 
     def coords_to_bbox_mmap(self, z, x, y):
-        z = int(z)
-        x = int(x)
-        y = int(y)
-
         # set up bounding box from coord
         coord = ModestMaps.Core.Coordinate(y, x, z)
         tl = self.projection.coordinateLocation(coord)
@@ -44,11 +40,12 @@ class GeoJSONTile:
         """
         return geojson
 
-    def __init__(self, model, geometry_field=None, trim_to_boundary=True, properties=None):
+    def __init__(self, model, geometry_field=None, trim_to_boundary=True, properties=None, primary_key=None):
         self.model = model
         self.geometry_field = geometry_field
         self.trim_to_boundary = trim_to_boundary
         self.properties = properties
+        self.primary_key = primary_key
 
         # if geometry field name is not specified,
         # use the first GeometryField that is found
@@ -60,6 +57,10 @@ class GeoJSONTile:
                 pass
 
     def __call__(self, request, z, x, y):
+        z = int(z)
+        x = int(x)
+        y = int(y)
+
         if self.geometry_field == None:
             return HttpResponseServerError('No geometry was specified or the model "%s" did not have a GeometryField present' % (self.model._meta.object_name))
 
@@ -87,6 +88,8 @@ class GeoJSONTile:
         }
         if self.properties:
             serializer_options.update(properties=self.properties)
+        if self.primary_key:
+            serializer_options.update(primary_key=self.primary_key)
 
         shapes = self.pre_serialization(shapes, z, x, y, bbox)
         data = self.serializer.serialize(shapes, **serializer_options)
