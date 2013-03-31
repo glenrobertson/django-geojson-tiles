@@ -10,8 +10,8 @@ import datetime
 import decimal
 import types
 
-from django.db.models.base import ModelBase
-from django.db.models.query import ValuesQuerySet
+from django.db.models.base import Model
+from django.db.models.query import QuerySet, ValuesQuerySet
 from django.core.serializers.python import Serializer as PythonSerializer
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.encoding import is_protected_type, smart_unicode
@@ -65,11 +65,11 @@ class GeoJSONSerializer(PythonSerializer):
         if self.primary_key and hasattr(self.primary_key, '__call__'):
             primary_key = self.primary_key(obj)
         elif self.primary_key and isinstance(self.primary_key, basestring):
-            if isinstance(obj, ModelBase):
+            if isinstance(obj, Model):
                 primary_key = getattr(obj, self.primary_key)
             else:
                 primary_key = obj[self.primary_key]
-        elif isinstance(obj, ModelBase):
+        elif isinstance(obj, Model):
             primary_key = obj.pk
 
         if primary_key:
@@ -91,7 +91,7 @@ class GeoJSONSerializer(PythonSerializer):
         json.dump(self.feature_collection, self.stream, cls=DjangoGeoJSONEncoder, **self.options)
 
     def handle_field(self, obj, field_name):
-        if isinstance(obj, ModelBase):
+        if isinstance(obj, Model):
             value = getattr(obj, field_name)
         elif isinstance(obj, dict):
             value = obj[field_name]
@@ -175,11 +175,14 @@ class GeoJSONSerializer(PythonSerializer):
                 # as it is in the id of the feature
                 if field.name == queryset.model._meta.pk.name:
                     continue
+                # ignore other geometries
+                if isinstance(field, GeometryField):
+                    continue
 
                 if field.serialize or field.primary_key:
                     if field.rel is None:
                         if self.properties is None or field.attname in self.properties:
-                            self.handle_field(obj, field)
+                            self.handle_field(obj, field.name)
                     else:
                         if self.properties is None or field.attname[:-3] in self.properties:
                             self.handle_fk_field(obj, field)
