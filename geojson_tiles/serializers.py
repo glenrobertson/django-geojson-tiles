@@ -9,13 +9,13 @@ except ImportError:
 import datetime
 import decimal
 import types
+import json
 
 from django.db.models.base import Model
 from django.db.models.query import QuerySet, ValuesQuerySet
 from django.core.serializers.python import Serializer as PythonSerializer
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.encoding import is_protected_type, smart_unicode
-from django.utils import simplejson as json
 from django.utils import datetime_safe
 from django.contrib.gis.geos.geometry import GEOSGeometry
 from django.contrib.gis.db.models.fields import GeometryField
