@@ -15,6 +15,7 @@ from django.db.models.base import Model
 from django.db.models.query import QuerySet, ValuesQuerySet
 from django.core.serializers.python import Serializer as PythonSerializer
 from django.core.serializers.json import DjangoJSONEncoder
+from django.core.serializers.base import SerializationError
 from django.utils.encoding import is_protected_type, smart_unicode
 from django.utils import datetime_safe
 from django.contrib.gis.geos.geometry import GEOSGeometry
@@ -99,9 +100,16 @@ class GeoJSONSerializer(PythonSerializer):
             # Only supports dicts and models, not lists (e.g. values_list)
             return
 
-        if field_name == self.geometry_field and isinstance(value, GEOSGeometry):
-            # ignore other geometries, only one geometry per feature
-            self._current['geometry'] = value
+        # ignore other geometries, only one geometry per feature
+        if field_name == self.geometry_field:
+            # this will handle GEOSGeometry objects and string representations (e.g. ewkt, bwkt)
+            try:
+                self._current['geometry'] = GEOSGeometry(value)
+            # if the geometry couldn't be parsed, we can't generate valid geojson
+            except ValueError:
+                raise SerializationError('The field ["%s", "%s"] could not be parsed as a valid geometry' % (
+                    self.geometry_field, value
+                ))
 
         elif self.properties and \
             field_name in self.properties:
