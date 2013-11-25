@@ -15,8 +15,6 @@ class GeoJSONTile:
     provider = ModestMaps.OpenStreetMap.Provider()
     srid = 4326
 
-    serializer = GeoJSONSerializer()
-
     def coords_to_bbox_mmap(self, z, x, y):
         # set up bounding box from coord
         coord = ModestMaps.Core.Coordinate(y, x, z)
@@ -91,7 +89,9 @@ class GeoJSONTile:
         if self.primary_key:
             serializer_options.update(primary_key=self.primary_key)
 
+        serializer = GeoJSONSerializer()
+
         shapes = self.pre_serialization(shapes, z, x, y, bbox)
-        data = self.serializer.serialize(shapes, **serializer_options)
+        data = serializer.serialize(shapes, **serializer_options)
         data = self.post_serialization(data, z, x, y, bbox)
         return HttpResponse(data, content_type='application/json')
